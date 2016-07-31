@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include <hardware_legacy/vibrator.h>
 #include "qemu.h"
 
@@ -20,6 +21,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+
+#include <cutils/log.h>
+
+#ifdef HAVE_OPENSOURCE_IMMVIBE
+#include <immvibeconn.h>
+#endif
 
 #define THE_DEVICE "/sys/class/timed_output/vibrator/enable"
 
@@ -31,6 +38,11 @@ int vibrator_exists()
     if (qemu_check()) {
         return 1;
     }
+#endif
+
+#ifdef HAVE_OPENSOURCE_IMMVIBE
+    /* TODO */
+    return 1;
 #endif
 
     fd = open(THE_DEVICE, O_RDWR);
@@ -49,6 +61,23 @@ static int sendit(int timeout_ms)
     if (qemu_check()) {
         return qemu_control_command( "vibrator:%d", timeout_ms );
     }
+#endif
+
+#ifdef HAVE_OPENSOURCE_IMMVIBE
+    fd = immvibe_conn_open();
+    if (fd < 0) {
+        return errno;
+    }
+
+    if (timeout_ms) {
+        ret = immvibe_conn_vibrate(fd, timeout_ms);
+    } else {
+        ret = immvibe_conn_stop(fd);
+    }
+
+    close(fd);
+
+    return ret ? -1 : 0;
 #endif
 
     fd = open(THE_DEVICE, O_RDWR);
